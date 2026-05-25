@@ -1,0 +1,3 @@
+* linguist-deterministic=true
+cli/** linguist-vendored=false
+web/** linguist-vendored=false
