@@ -132,7 +132,3 @@ Google Maps:  https://www.google.com/maps/search/?api=1&query=37.3861,-122.0840
 ## License
 
 MIT License - See [LICENSE](LICENSE)
-
-## Author
-
-@dogesenic
