@@ -38,24 +38,26 @@ jobs:
       
       - name: Build Release
         working-directory: ./cli
-        run: |
-          cargo build --release --target ${{ matrix.target }}
+        run: cargo build --release --target ${{ matrix.target }}
       
       - name: Rename binary
+        id: rename
         run: |
           TARGET=${{ matrix.target }}
-          cd target/$TARGET/release
-          if [ -f nscam.exe ]; then
-            cp nscam.exe ../../../../nscam-$TARGET.exe
+          SOURCE_DIR="cli/target/$TARGET/release"
+          if [[ "$TARGET" == *"windows"* ]]; then
+            cp "$SOURCE_DIR/nscam.exe" "nscam-$TARGET.exe"
+            echo "FILE=nscam-$TARGET.exe" >> $GITHUB_OUTPUT
           else
-            cp nscam ../../../../nscam-$TARGET
+            cp "$SOURCE_DIR/nscam" "nscam-$TARGET"
+            echo "FILE=nscam-$TARGET" >> $GITHUB_OUTPUT
           fi
       
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: nscam-${{ matrix.target }}
-          path: nscam-*
+          path: ${{ steps.rename.outputs.FILE }}
 
   release:
     needs: build
