@@ -1,3 +1,5 @@
-* linguist-deterministic=true
-cli/** linguist-vendored=false
-web/** linguist-vendored=false
+*.rs linguist-language=Rust
+*.toml linguist-language=Rust
+
+web/** linguist-vendored
+web/** linguist-ignored
