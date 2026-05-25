@@ -63,6 +63,7 @@ cargo build --release
 cd web
 php -S localhost:8080
 # Open http://localhost:8080
+# or Open http://nscam.gt.tc/
 ```
 
 #### Hosting (000webhost, InfinityFree, etc.)
