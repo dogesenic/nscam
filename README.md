@@ -127,7 +127,7 @@ Google Maps:  https://www.google.com/maps/search/?api=1&query=37.3861,-122.0840
 | Version | Language | Framework |
 |---------|----------|-----------|
 | CLI | Rust | Tokio, Reqwest, Clap |
-| Web | PHP | Native (No framework) |
+| Web | PHP | Native |
 
 ## License
 
