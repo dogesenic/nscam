@@ -6,28 +6,80 @@ $target = $_GET['target'] ?? '';
 $data = null;
 $error = null;
 
-if ($target) {
-    if (filter_var($target, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) === false) {
-        $ipv4 = gethostbyname($target);
-        if ($ipv4 !== $target) {
-            $target = $ipv4;
-        }
-    }
+function isPrivateOrReservedIP($ip) {
+    $octets = explode('.', $ip);
+    if (count($octets) !== 4) return false;
     
-    $url = "http://ip-api.com/json/" . urlencode($target) . "?fields=status,message,query,isp,org,as,country,country_code,region,region_name,city,zip,lat,lon,timezone,mobile,proxy,hosting";
-    
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-    $response = curl_exec($ch);
-    
-    $result = json_decode($response, true);
+    $first = (int)$octets[0];
+    $second = (int)$octets[1];
+    $third = (int)$octets[2];
 
-    if ($result && $result['status'] === 'success') {
-        $data = $result;
+    // RFC 1918 & Reserves Check Logicc
+    // 10.0.0.0/8
+    if ($first === 10) return true;
+    // 172.16.0.0/12
+    if ($first === 172 && $second >= 16 && $second <= 31) return true;
+    // 192.168.0.0/16
+    if ($first === 192 && $second === 168) return true;
+    // 127.0.0.0/8 (Loopback)
+    if ($first === 127) return true;
+    // 169.254.0.0/16 (Link-local)
+    if ($first === 169 && $second === 254) return true;
+    // 100.64.0.0/10 (CGN)
+    if ($first === 100 && $second >= 64 && $second <= 127) return true;
+    
+    return false;
+}
+
+if ($target) {
+    if (!preg_match('/^[a-zA-Z0-9\.\-]+$/', $target)) {
+        $error = "Invalid characters detected.";
     } else {
-        $error = $result['message'] ?? "Invalid IP or Domain";
+        $resolvedIp = $target;
+        $isDomain = false;
+
+        if (filter_var($target, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) === false) {
+            if (strpos($target, '.') === false) {
+                $error = "Invalid format. Please enter a valid IP or Domain.";
+            } else {
+                $resolvedIp = gethostbyname($target);
+                $isDomain = true;
+                if ($resolvedIp === $target) {
+                    $error = "Could not resolve domain.";
+                }
+            }
+        } else {
+            $resolvedIp = $target;
+        }
+
+        if (!$error && isPrivateOrReservedIP($resolvedIp)) {
+            $error = "Access Denied. Private/Internal IP addresses are not allowed.";
+            $resolvedIp = null;
+        }
+
+        if (!$error && $resolvedIp) {
+            $url = "http://ip-api.com/json/" . urlencode($resolvedIp) . "?fields=status,message,query,isp,org,as,country,country_code,region,region_name,city,zip,lat,lon,timezone,mobile,proxy,hosting";
+            
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+            
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            
+            if ($httpCode === 200) {
+                $result = json_decode($response, true);
+                if ($result && $result['status'] === 'success') {
+                    $data = $result;
+                } else {
+                    $error = $result['message'] ?? "Invalid IP or Domain";
+                }
+            } else {
+                $error = "API Service Unavailable";
+            }
+        }
     }
 }
 ?>
@@ -40,19 +92,44 @@ if ($target) {
     <title>Nscam - IP Geolocation & Scam Tracker</title>
     <style>
         * { box-sizing: border-box; }
-        body { background: #0d1117; color: #c9d1d9; margin: 0; padding: 20px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+        body { 
+            background: #2A2833; 
+            color: #c9d1d9; 
+            margin: 0; 
+            padding: 20px; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; 
+        }
         .container { max-width: 800px; margin: 0 auto; }
         
         .header { text-align: center; margin-bottom: 30px; }
-        .header h1 { margin: 0; color: #58a6ff; font-size: 2.5rem; }
+        .header h1 { margin: 0; color: #A6A6A6; font-size: 2.5rem; }
         .header p { margin: 5px 0 0; color: #8b949e; }
         
         .search-box { margin-bottom: 30px; text-align: center; }
         .search-box form { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
-        input { padding: 12px 15px; width: 60%; max-width: 400px; border: 1px solid #30363d; background: #0d1117; color: white; border-radius: 6px; font-size: 16px; }
-        input:focus { outline: none; border-color: #58a6ff; }
-        button { padding: 12px 25px; background: #58a6ff; color: #0d1117; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 16px; }
-        button:hover { background: #79b8ff; }
+        input { 
+            padding: 12px 15px; 
+            width: 60%; 
+            max-width: 400px; 
+            border: 1px solid #30363d; 
+            background: #161b22; 
+            color: white; 
+            border-radius: 6px; 
+            font-size: 16px; 
+        }
+        input:focus { outline: none; border-color: #4CAF50; }
+        
+        button { 
+            padding: 12px 25px; 
+            background: #238636; 
+            color: #ffffff; 
+            border: none; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            font-weight: bold; 
+            font-size: 16px; 
+        }
+        button:hover { background: #2ea043; } 
         
         .result-box { background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 20px; <?= ($data) ? 'display:block' : 'display:none'; ?> }
         
@@ -77,7 +154,7 @@ if ($target) {
         .map-link { color: #58a6ff; text-decoration: none; font-size: 14px; }
         .map-link:hover { text-decoration: underline; }
 
-        .error { color: #0d1117; text-align: center; background: #58a6ff; padding: 15px; border-radius: 6px; margin-bottom: 20px; }
+        .error { color: #0d1117; text-align: center; background: #d29922; padding: 15px; border-radius: 6px; margin-bottom: 20px; }
         
         .footer { text-align: center; margin-top: 30px; color: #8b949e; font-size: 14px; }
         .footer a { color: #58a6ff; text-decoration: none; }
@@ -105,7 +182,7 @@ if ($target) {
     </div>
 
     <?php if ($error): ?>
-        <div class="error"><?= $error ?></div>
+        <div class="error"><?= htmlspecialchars($error) ?></div>
     <?php endif; ?>
 
     <?php if ($data): ?>
@@ -130,37 +207,37 @@ if ($target) {
         
         <div class="row">
             <span class="label">ISP</span>
-            <span class="value"><?= $data['isp'] ?? '-' ?></span>
+            <span class="value"><?= htmlspecialchars($data['isp'] ?? '-') ?></span>
         </div>
         <div class="row">
             <span class="label">Organization</span>
-            <span class="value"><?= $data['org'] ?? '-' ?></span>
+            <span class="value"><?= htmlspecialchars($data['org'] ?? '-') ?></span>
         </div>
         <div class="row">
             <span class="label">AS Number</span>
-            <span class="value"><?= $data['as'] ?? '-' ?></span>
+            <span class="value"><?= htmlspecialchars($data['as'] ?? '-') ?></span>
         </div>
 
         <h3>GEOLOCATION</h3>
         <div class="row">
             <span class="label">Country</span>
-            <span class="value"><?= $data['country'] ?? '-' ?> (<?= $data['country_code'] ?? '-' ?>)</span>
+            <span class="value"><?= htmlspecialchars($data['country'] ?? '-') ?> (<?= htmlspecialchars($data['country_code'] ?? '-') ?>)</span>
         </div>
         <div class="row">
             <span class="label">Region</span>
-            <span class="value"><?= $data['region_name'] ?? '-' ?></span>
+            <span class="value"><?= htmlspecialchars($data['region_name'] ?? '-') ?></span>
         </div>
         <div class="row">
             <span class="label">City</span>
-            <span class="value"><?= $data['city'] ?? '-' ?></span>
+            <span class="value"><?= htmlspecialchars($data['city'] ?? '-') ?></span>
         </div>
         <div class="row">
             <span class="label">ZIP Code</span>
-            <span class="value"><?= $data['zip'] ?? '-' ?></span>
+            <span class="value"><?= htmlspecialchars($data['zip'] ?? '-') ?></span>
         </div>
         <div class="row">
             <span class="label">Timezone</span>
-            <span class="value"><?= $data['timezone'] ?? '-' ?></span>
+            <span class="value"><?= htmlspecialchars($data['timezone'] ?? '-') ?></span>
         </div>
 
         <?php if(!empty($data['lat']) && !empty($data['lon'])): ?>
@@ -172,7 +249,7 @@ if ($target) {
                 loading="lazy">
             </iframe>
             <div class="map-footer">
-                <span class="coordinates">📍 <?= $data['lat'] ?>, <?= $data['lon'] ?></span>
+                <span class="coordinates">📍 <?= htmlspecialchars($data['lat']) ?>, <?= htmlspecialchars($data['lon']) ?></span>
                 <a class="map-link" href="https://www.google.com/maps/search/?api=1&query=<?= $data['lat'] ?>,<?= $data['lon'] ?>" target="_blank">Open in Google Maps →</a>
             </div>
         </div>
