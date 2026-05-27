@@ -258,7 +258,7 @@ if ($target) {
     <?php endif; ?>
     
     <div class="footer">
-        <p>Author - <a href="https://github.com/dogesenic/nscam">@dogesenic</a></p>
+        <p>Author - <a href="https://github.com/dogesenic">@dogesenic</a></p>
     </div>
 </div>
 
